@@ -105,10 +105,10 @@ impl View for Split {
 
         with_scope(cx, || match axis {
             Orientation::Horizontal => {
-                split_h(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
+                split_v(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
             }
             Orientation::Vertical => {
-                split_v(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
+                split_h(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
             }
         })
         .build()
