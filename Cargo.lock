@@ -1074,7 +1074,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "floem-split"
+name = "floem-things"
 version = "0.1.0"
 dependencies = [
  "floem",
