@@ -163,6 +163,7 @@ fn dragger_v(
     size: RwSignal<Size>,
 ) -> impl View {
     empty()
+        .class(SplitDraggerVerticalClass)
         .style(move |s| {
             let size = size.get();
             let px = px_w(size.height, height.get());
