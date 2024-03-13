@@ -1,45 +1,112 @@
 use floem::{
     event::{Event, EventListener},
+    id::Id,
     kurbo::Size,
     peniko::Color,
     pointer::PointerMoveEvent,
-    reactive::RwSignal,
+    reactive::{with_scope, RwSignal, Scope},
     style::Style,
     style_class,
     unit::{PxPct, PxPctAuto},
-    view::View,
+    view::{AnyView, View, ViewData},
     views::{container, empty, h_stack, v_stack, Decorators},
 };
+
+use crate::Orientation;
 
 style_class!(pub SplitDraggerHorizontalClass);
 style_class!(pub SplitDraggerVerticalClass);
 
-const fn to_auto(pct: PxPct) -> PxPctAuto {
-    match pct {
-        PxPct::Pct(p) => PxPctAuto::Pct(p),
-        PxPct::Px(p) => PxPctAuto::Px(p),
+pub struct Split {
+    data: ViewData,
+    cx: Scope,
+
+    a: AnyView,
+    b: AnyView,
+
+    min_split: f64,
+    default_split: PxPct,
+    dynamic: bool,
+
+    size: Size,
+    width: PxPct,
+    dragging: bool,
+
+    axis: Orientation,
+}
+
+impl Split {
+    pub fn new(a: AnyView, b: AnyView) -> Self {
+        let id = Id::next();
+        let cx = Scope::new();
+
+        Self {
+            data: ViewData::new(id),
+            cx,
+
+            a,
+            b,
+
+            min_split: 50.0,
+            default_split: PxPct::Pct(50.0),
+            dynamic: true,
+
+            size: Size::ZERO,
+            width: PxPct::Pct(50.0),
+            dragging: false,
+
+            axis: Orientation::Vertical,
+        }
     }
 }
 
-#[inline]
-fn px_w(width: f64, w: PxPct) -> f64 {
-    match w {
-        PxPct::Pct(p) => width * (p / 100.0),
-        PxPct::Px(p) => p,
+impl View for Split {
+    fn view_data(&self) -> &ViewData {
+        &self.data
+    }
+
+    fn view_data_mut(&mut self) -> &mut ViewData {
+        &mut self.data
+    }
+
+    fn build(self) -> floem::view::AnyWidget {
+        let cx = self.cx;
+
+        let min_split = self.min_split;
+        let default_split = self.default_split;
+        let dynamic = self.dynamic;
+
+        let size = cx.create_rw_signal(self.size);
+        let w_h = cx.create_rw_signal(self.width);
+        let dragging = cx.create_rw_signal(self.dragging);
+
+        let axis = self.axis;
+
+        let a = self.a;
+        let b = self.b;
+
+        with_scope(cx, || match axis {
+            Orientation::Horizontal => {
+                split_h(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
+            }
+            Orientation::Vertical => {
+                split_v(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
+            }
+        })
+        .build()
     }
 }
 
 pub fn split_h(
     a: impl View + 'static,
     b: impl View + 'static,
+    size: RwSignal<Size>,
+    width: RwSignal<PxPct>,
+    dragging: RwSignal<bool>,
     min_split: f64,
     default_split: PxPct,
     dynamic: bool,
 ) -> impl View {
-    let size = RwSignal::new(Size::ZERO);
-    let width = RwSignal::new(default_split);
-    let dragging = RwSignal::new(false);
-
     let dragger = dragger_h(width, dragging, min_split, default_split, size);
 
     let a_con = container(a).style(move |s| s.min_width(min_split).width(to_auto(width.get())));
@@ -74,14 +141,13 @@ pub fn split_h(
 pub fn split_v(
     a: impl View + 'static,
     b: impl View + 'static,
+    size: RwSignal<Size>,
+    height: RwSignal<PxPct>,
+    dragging: RwSignal<bool>,
     min_split: f64,
     default_split: PxPct,
     dynamic: bool,
 ) -> impl View {
-    let size = RwSignal::new(Size::ZERO);
-    let height = RwSignal::new(default_split);
-    let dragging = RwSignal::new(false);
-
     let dragger = dragger_v(height, dragging, min_split, default_split, size);
 
     let a_con = container(a).style(move |s| s.min_height(min_split).height(to_auto(height.get())));
@@ -194,4 +260,20 @@ fn dragger_v(
             height.set(default_split);
             dragging.set(false);
         })
+}
+
+#[inline]
+const fn to_auto(pct: PxPct) -> PxPctAuto {
+    match pct {
+        PxPct::Pct(p) => PxPctAuto::Pct(p),
+        PxPct::Px(p) => PxPctAuto::Px(p),
+    }
+}
+
+#[inline]
+fn px_w(width: f64, w: PxPct) -> f64 {
+    match w {
+        PxPct::Pct(p) => width * (p / 100.0),
+        PxPct::Px(p) => p,
+    }
 }
