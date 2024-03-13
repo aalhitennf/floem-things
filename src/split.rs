@@ -27,12 +27,11 @@ pub struct Split {
     min_split: f64,
     default_split: PxPct,
     dynamic: bool,
+    axis: Orientation,
 
     size: Size,
     width: PxPct,
     dragging: bool,
-
-    axis: Orientation,
 }
 
 impl Split {
@@ -50,13 +49,32 @@ impl Split {
             min_split: 50.0,
             default_split: PxPct::Pct(50.0),
             dynamic: true,
+            axis: Orientation::Vertical,
 
             size: Size::ZERO,
             width: PxPct::Pct(50.0),
             dragging: false,
-
-            axis: Orientation::Vertical,
         }
+    }
+
+    pub fn min_split(mut self, value: f64) -> Self {
+        self.min_split = value;
+        self
+    }
+
+    pub fn default_split(mut self, value: PxPct) -> Self {
+        self.default_split = value;
+        self
+    }
+
+    pub fn dynamic(mut self, value: bool) -> Self {
+        self.dynamic = value;
+        self
+    }
+
+    pub fn orientation(mut self, orientation: Orientation) -> Self {
+        self.axis = orientation;
+        self
     }
 }
 
