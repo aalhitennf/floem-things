@@ -115,7 +115,7 @@ impl View for Split {
     }
 }
 
-pub fn split_h(
+fn split_h(
     a: impl View + 'static,
     b: impl View + 'static,
     size: RwSignal<Size>,
@@ -156,7 +156,7 @@ pub fn split_h(
         .style(Style::size_full)
 }
 
-pub fn split_v(
+fn split_v(
     a: impl View + 'static,
     b: impl View + 'static,
     size: RwSignal<Size>,
