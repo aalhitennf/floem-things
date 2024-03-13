@@ -1,0 +1,10 @@
+[package]
+name = "floem-split"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+floem = { git = "https://github.com/lapce/floem", default-features = false }
+
+[features]
+split = []
