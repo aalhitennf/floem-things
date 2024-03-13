@@ -8,5 +8,3 @@ floem = { git = "https://github.com/aalhitennf/floem", default-features = false 
 
 [features]
 default = ["floem/rfd-async-std"]
-split = []
-h = []
