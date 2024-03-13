@@ -30,7 +30,7 @@ pub struct Split {
     axis: Orientation,
 
     size: Size,
-    width: PxPct,
+    split_value: PxPct,
     dragging: bool,
 }
 
@@ -52,7 +52,7 @@ impl Split {
             axis: Orientation::Vertical,
 
             size: Size::ZERO,
-            width: PxPct::Pct(50.0),
+            split_value: PxPct::Pct(50.0),
             dragging: false,
         }
     }
@@ -64,6 +64,7 @@ impl Split {
 
     pub fn default_split(mut self, value: PxPct) -> Self {
         self.default_split = value;
+        self.split_value = value;
         self
     }
 
@@ -95,7 +96,7 @@ impl View for Split {
         let dynamic = self.dynamic;
 
         let size = cx.create_rw_signal(self.size);
-        let w_h = cx.create_rw_signal(self.width);
+        let split_value = cx.create_rw_signal(self.split_value);
         let dragging = cx.create_rw_signal(self.dragging);
 
         let axis = self.axis;
@@ -104,17 +105,34 @@ impl View for Split {
         let b = self.b;
 
         with_scope(cx, || match axis {
-            Orientation::Horizontal => {
-                split_v(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
-            }
-            Orientation::Vertical => {
-                split_h(a, b, size, w_h, dragging, min_split, default_split, dynamic).any()
-            }
+            Orientation::Horizontal => split_v(
+                a,
+                b,
+                size,
+                split_value,
+                dragging,
+                min_split,
+                default_split,
+                dynamic,
+            )
+            .any(),
+            Orientation::Vertical => split_h(
+                a,
+                b,
+                size,
+                split_value,
+                dragging,
+                min_split,
+                default_split,
+                dynamic,
+            )
+            .any(),
         })
         .build()
     }
 }
 
+#[inline]
 fn split_h(
     a: impl View + 'static,
     b: impl View + 'static,
@@ -156,6 +174,7 @@ fn split_h(
         .style(Style::size_full)
 }
 
+#[inline]
 fn split_v(
     a: impl View + 'static,
     b: impl View + 'static,
