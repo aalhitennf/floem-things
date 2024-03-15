@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-floem = { git = "https://github.com/aalhitennf/floem", default-features = false }
+floem = { git = "https://github.com/aalhitennf/floem", branch = "menu_style", default-features = false }
 
 [features]
 default = ["floem/rfd-async-std"]

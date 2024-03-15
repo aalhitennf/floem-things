@@ -1048,7 +1048,7 @@ checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 [[package]]
 name = "floem"
 version = "0.1.1"
-source = "git+https://github.com/aalhitennf/floem#4fa783db6f7467abadb783c645e3960aaa582575"
+source = "git+https://github.com/aalhitennf/floem?branch=menu_style#21708de5d2b17588b92b4eb81573e78f3fcdca3a"
 dependencies = [
  "bitflags 2.4.2",
  "copypasta",
@@ -1183,7 +1183,7 @@ dependencies = [
 [[package]]
 name = "floem_reactive"
 version = "0.1.1"
-source = "git+https://github.com/aalhitennf/floem#4fa783db6f7467abadb783c645e3960aaa582575"
+source = "git+https://github.com/aalhitennf/floem?branch=menu_style#21708de5d2b17588b92b4eb81573e78f3fcdca3a"
 dependencies = [
  "smallvec",
 ]
@@ -1191,7 +1191,7 @@ dependencies = [
 [[package]]
 name = "floem_renderer"
 version = "0.1.1"
-source = "git+https://github.com/aalhitennf/floem#4fa783db6f7467abadb783c645e3960aaa582575"
+source = "git+https://github.com/aalhitennf/floem?branch=menu_style#21708de5d2b17588b92b4eb81573e78f3fcdca3a"
 dependencies = [
  "floem-cosmic-text",
  "floem-peniko",
@@ -1202,7 +1202,7 @@ dependencies = [
 [[package]]
 name = "floem_tiny_skia_renderer"
 version = "0.1.1"
-source = "git+https://github.com/aalhitennf/floem#4fa783db6f7467abadb783c645e3960aaa582575"
+source = "git+https://github.com/aalhitennf/floem?branch=menu_style#21708de5d2b17588b92b4eb81573e78f3fcdca3a"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1219,7 +1219,7 @@ dependencies = [
 [[package]]
 name = "floem_vger_renderer"
 version = "0.1.1"
-source = "git+https://github.com/aalhitennf/floem#4fa783db6f7467abadb783c645e3960aaa582575"
+source = "git+https://github.com/aalhitennf/floem?branch=menu_style#21708de5d2b17588b92b4eb81573e78f3fcdca3a"
 dependencies = [
  "anyhow",
  "floem-peniko",
