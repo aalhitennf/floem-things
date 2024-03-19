@@ -5,7 +5,7 @@ use floem::{
     peniko::Color,
     pointer::PointerMoveEvent,
     reactive::{with_scope, RwSignal, Scope},
-    style::Style,
+    style::{CursorStyle, Style},
     style_class,
     unit::{PxPct, PxPctAuto},
     view::{AnyView, View, ViewData},
@@ -57,14 +57,15 @@ impl Split {
         }
     }
 
+    /// Pixels
     pub fn min_split(mut self, value: f64) -> Self {
         self.min_split = value;
         self
     }
 
-    pub fn default_split(mut self, value: PxPct) -> Self {
-        self.default_split = value;
-        self.split_value = value;
+    pub fn default_split(mut self, value: impl Into<PxPct> + Clone) -> Self {
+        self.default_split = value.clone().into();
+        self.split_value = value.into();
         self
     }
 
@@ -133,7 +134,7 @@ impl View for Split {
 }
 
 #[inline]
-fn split_h(
+fn split_v(
     a: impl View + 'static,
     b: impl View + 'static,
     size: RwSignal<Size>,
@@ -143,7 +144,7 @@ fn split_h(
     default_split: PxPct,
     dynamic: bool,
 ) -> impl View {
-    let dragger = dragger_h(width, dragging, min_split, default_split, size);
+    let dragger = dragger_v(width, dragging, min_split, default_split, size);
 
     let a_con = container(a).style(move |s| s.min_width(min_split).width(to_auto(width.get())));
     let b_con = container(b).style(move |s| {
@@ -159,7 +160,7 @@ fn split_h(
         .on_resize(move |rect| {
             size.set(rect.size());
         })
-        .on_event_cont(EventListener::DragOver, move |e| {
+        .on_event_stop(EventListener::DragOver, move |e| {
             if let Event::PointerMove(PointerMoveEvent { pos, .. }) = e {
                 if dragging.get() {
                     if dynamic {
@@ -175,7 +176,7 @@ fn split_h(
 }
 
 #[inline]
-fn split_v(
+fn split_h(
     a: impl View + 'static,
     b: impl View + 'static,
     size: RwSignal<Size>,
@@ -185,7 +186,7 @@ fn split_v(
     default_split: PxPct,
     dynamic: bool,
 ) -> impl View {
-    let dragger = dragger_v(height, dragging, min_split, default_split, size);
+    let dragger = dragger_h(height, dragging, min_split, default_split, size);
 
     let a_con = container(a).style(move |s| s.min_height(min_split).height(to_auto(height.get())));
 
@@ -202,7 +203,7 @@ fn split_v(
         .on_resize(move |rect| {
             size.set(rect.size());
         })
-        .on_event_cont(EventListener::DragOver, move |e| {
+        .on_event_stop(EventListener::DragOver, move |e| {
             if let Event::PointerMove(PointerMoveEvent { pos, .. }) = e {
                 if dragging.get() {
                     if dynamic {
@@ -217,8 +218,9 @@ fn split_v(
         .style(Style::size_full)
 }
 
+#[inline]
 fn dragger_h(
-    width: RwSignal<PxPct>,
+    height: RwSignal<PxPct>,
     dragging: RwSignal<bool>,
     min_size: f64,
     default_split: PxPct,
@@ -226,6 +228,69 @@ fn dragger_h(
 ) -> impl View {
     empty()
         .class(SplitDraggerHorizontalClass)
+        .style(move |s| {
+            let size = size.get();
+            let px = px_w(size.height, height.get());
+            let max = size.height - min_size;
+
+            let w = if px < min_size {
+                min_size
+            } else if px > max {
+                max
+            } else {
+                px
+            };
+
+            let w_pct = PxPctAuto::Pct(((w / size.height) * 100.0).abs());
+
+            s.inset_top(w_pct)
+                .absolute()
+                .width_full()
+                .z_index(10)
+                .height(4)
+                .background(Color::rgb8(205, 205, 205))
+                .hover(|s| {
+                    s.height(6)
+                        .z_index(11)
+                        .background(Color::rgb8(41, 98, 218))
+                        .border_color(Color::rgb8(41, 98, 218))
+                        .cursor(CursorStyle::RowResize)
+                })
+                .apply_if(dragging.get(), |s| {
+                    s.height(6)
+                        .z_index(100)
+                        .border_color(Color::rgb8(41, 98, 218))
+                        .background(Color::rgb8(41, 98, 218))
+                })
+        })
+        .draggable()
+        .dragging_style(|s| {
+            s.background(Color::TRANSPARENT)
+                .border(0)
+                .cursor(CursorStyle::RowResize)
+        })
+        .on_event_stop(EventListener::DragStart, move |_| {
+            dragging.set(true);
+        })
+        .on_event_stop(EventListener::DragEnd, move |_| {
+            dragging.set(false);
+        })
+        .on_event_stop(EventListener::DoubleClick, move |_| {
+            height.set(default_split);
+            dragging.set(false);
+        })
+}
+
+#[inline]
+fn dragger_v(
+    width: RwSignal<PxPct>,
+    dragging: RwSignal<bool>,
+    min_size: f64,
+    default_split: PxPct,
+    size: RwSignal<Size>,
+) -> impl View {
+    empty()
+        .class(SplitDraggerVerticalClass)
         .style(move |s| {
             let size = size.get();
             let px = px_w(size.width, width.get());
@@ -242,10 +307,31 @@ fn dragger_h(
             let w_pct = PxPctAuto::Pct(((w / size.width) * 100.0).abs());
 
             s.inset_left(w_pct)
-                .apply_if(dragging.get(), |s| s.border_left(2))
+                .absolute()
+                .height_full()
+                .z_index(10)
+                .width(4)
+                .background(Color::rgb8(205, 205, 205))
+                .hover(|s| {
+                    s.z_index(11)
+                        .width(6)
+                        .background(Color::rgb8(41, 98, 218))
+                        .border_color(Color::rgb8(41, 98, 218))
+                        .cursor(CursorStyle::ColResize)
+                })
+                .apply_if(dragging.get(), |s| {
+                    s.width(6)
+                        .z_index(100)
+                        .border_color(Color::rgb8(41, 98, 218))
+                        .background(Color::rgb8(41, 98, 218))
+                })
         })
         .draggable()
-        .dragging_style(|s| s.border_color(Color::TRANSPARENT))
+        .dragging_style(|s| {
+            s.background(Color::TRANSPARENT)
+                .border(0)
+                .cursor(CursorStyle::ColResize)
+        })
         .on_event_stop(EventListener::DragStart, move |_| {
             dragging.set(true);
         })
@@ -254,47 +340,6 @@ fn dragger_h(
         })
         .on_event_stop(EventListener::DoubleClick, move |_| {
             width.set(default_split);
-            dragging.set(false);
-        })
-}
-
-fn dragger_v(
-    height: RwSignal<PxPct>,
-    dragging: RwSignal<bool>,
-    min_size: f64,
-    default_split: PxPct,
-    size: RwSignal<Size>,
-) -> impl View {
-    empty()
-        .class(SplitDraggerVerticalClass)
-        .style(move |s| {
-            let size = size.get();
-            let px = px_w(size.height, height.get());
-            let max = size.height - min_size;
-
-            let w = if px < min_size {
-                min_size
-            } else if px > max {
-                max
-            } else {
-                px
-            };
-
-            let w_pct = PxPctAuto::Pct(((w / size.height) * 100.0).abs());
-
-            s.apply_if(dragging.get(), |s| s.border_top(2))
-                .inset_top(w_pct)
-        })
-        .draggable()
-        .dragging_style(|s| s.border_color(Color::TRANSPARENT))
-        .on_event_stop(EventListener::DragStart, move |_| {
-            dragging.set(true);
-        })
-        .on_event_stop(EventListener::DragEnd, move |_| {
-            dragging.set(false);
-        })
-        .on_event_stop(EventListener::DoubleClick, move |_| {
-            height.set(default_split);
             dragging.set(false);
         })
 }

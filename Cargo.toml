@@ -1,10 +1,7 @@
 [package]
 name = "floem-things"
-version = "0.1.0"
 edition = "2021"
+version = "0.1.0"
 
 [dependencies]
-floem = { git = "https://github.com/aalhitennf/floem", branch = "menu_style", default-features = false }
-
-[features]
-default = ["floem/rfd-async-std"]
+floem = { git = "https://github.com/lapce/floem", default-features = false, features = ["rfd-async-std"] }
