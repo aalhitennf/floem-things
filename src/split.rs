@@ -35,6 +35,7 @@ pub struct Split {
 }
 
 impl Split {
+    #[must_use]
     pub fn new(a: AnyView, b: AnyView) -> Self {
         let id = Id::next();
         let cx = Scope::new();
@@ -58,22 +59,26 @@ impl Split {
     }
 
     /// Pixels
+    #[must_use]
     pub fn min_split(mut self, value: f64) -> Self {
         self.min_split = value;
         self
     }
 
+    #[must_use]
     pub fn default_split(mut self, value: impl Into<PxPct> + Clone) -> Self {
         self.default_split = value.clone().into();
         self.split_value = value.into();
         self
     }
 
+    #[must_use]
     pub fn dynamic(mut self, value: bool) -> Self {
         self.dynamic = value;
         self
     }
 
+    #[must_use]
     pub fn orientation(mut self, orientation: Orientation) -> Self {
         self.axis = orientation;
         self
@@ -133,6 +138,7 @@ impl View for Split {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline]
 fn split_v(
     a: impl View + 'static,
@@ -175,6 +181,7 @@ fn split_v(
         .style(Style::size_full)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline]
 fn split_h(
     a: impl View + 'static,

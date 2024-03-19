@@ -22,6 +22,7 @@ pub struct Separator {
 }
 
 impl Separator {
+    #[must_use]
     pub fn new() -> Self {
         let id = Id::next();
 
@@ -34,21 +35,25 @@ impl Separator {
         }
     }
 
+    #[must_use]
     pub fn size(mut self, size: f64) -> Self {
         self.size = size;
         self
     }
 
+    #[must_use]
     pub fn margin(mut self, margin: f64) -> Self {
         self.margin = margin;
         self
     }
 
+    #[must_use]
     pub fn color(mut self, color: Color) -> Self {
         self.color = color;
         self
     }
 
+    #[must_use]
     pub fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
         self
