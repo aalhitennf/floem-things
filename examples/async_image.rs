@@ -36,15 +36,16 @@ fn main() {
 fn create_view() -> impl View {
     const URL: &str =
         "https://cdn.pixabay.com/photo/2016/12/20/15/49/eurasier-puppy-1920816_960_720.jpg";
-    const PLACEHOLDER: &[u8; 11211] = include_bytes!("../assets/placeholder.png");
+    let placeholder = include_bytes!("../assets/placeholder.png");
 
-    let show = RwSignal::new(true);
+    let show = RwSignal::new(false);
 
     let image = dyn_container(
         move || show.get(),
         move |show| {
             if show {
-                async_image(URL, Some(PLACEHOLDER.to_vec()))
+                async_image(URL)
+                    .placeholder(placeholder.to_vec())
                     .style(Style::size_full)
                     .any()
             } else {
