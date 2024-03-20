@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use floem::{
     ext_event::create_signal_from_channel,
@@ -12,8 +13,8 @@ pub struct AsyncImage {
     cx: Scope,
 
     url: String,
-    buffer: Vec<u8>,
-    fetch_channel: (Sender<Vec<u8>>, Receiver<Vec<u8>>),
+    buffer: Bytes,
+    fetch_channel: (Sender<Bytes>, Receiver<Bytes>),
 
     fetch_ok: bool,
 }
@@ -30,13 +31,13 @@ impl AsyncImage {
             data: ViewData::new(id),
             cx,
             url,
-            buffer: vec![],
+            buffer: Bytes::default(),
             fetch_channel,
             fetch_ok: false,
         }
     }
 
-    pub fn placeholder(mut self, bytes: impl Into<Vec<u8>>) -> Self {
+    pub fn placeholder(mut self, bytes: impl Into<Bytes>) -> Self {
         self.buffer = bytes.into();
         self
     }
@@ -66,15 +67,15 @@ impl View for AsyncImage {
     }
 }
 
-pub fn async_image(url: impl Into<String>, placeholder: Option<Vec<u8>>) -> impl View {
-    AsyncImage::new(url).placeholder(placeholder.unwrap_or_default())
+pub fn async_image(url: impl Into<String>, placeholder: Option<impl Into<Bytes>>) -> impl View {
+    AsyncImage::new(url).placeholder(placeholder.map_or(Bytes::default(), |p| p.into()))
 }
 
 fn async_image_view(
     url: String,
-    buffer: RwSignal<Vec<u8>>,
-    tx: RwSignal<Sender<Vec<u8>>>,
-    rx: Receiver<Vec<u8>>,
+    buffer: RwSignal<Bytes>,
+    tx: RwSignal<Sender<Bytes>>,
+    rx: Receiver<Bytes>,
     fetch_ok: RwSignal<bool>,
 ) -> impl View {
     let image_signal = create_signal_from_channel(rx);
@@ -106,11 +107,11 @@ fn async_image_view(
 }
 
 #[cfg(feature = "tokio")]
-fn fetch_tokio(url: String, sender: Sender<Vec<u8>>, fetch_ok: RwSignal<bool>) {
+fn fetch_tokio(url: String, sender: Sender<Bytes>, fetch_ok: RwSignal<bool>) {
     tokio::spawn(async move {
         let response = reqwest::get(url).await?;
         let bytes = response.bytes().await?;
-        if sender.send(bytes.to_vec()).is_ok() {
+        if sender.send(bytes).is_ok() {
             fetch_ok.set(true);
         }
 
@@ -119,30 +120,37 @@ fn fetch_tokio(url: String, sender: Sender<Vec<u8>>, fetch_ok: RwSignal<bool>) {
 }
 
 #[cfg(feature = "async-std")]
-fn fetch_async_std(url: String, sender: Sender<Vec<u8>>, fetch_ok: RwSignal<bool>) {
+fn fetch_async_std(url: String, sender: Sender<Bytes>, fetch_ok: RwSignal<bool>) {
     async_std::task::spawn(async move {
-        let mut response = surf::get(url).await?;
-        let bytes = response.body_bytes().await?;
-        if sender.send(bytes).is_ok() {
-            fetch_ok.set(true);
+        if let Err(e) = fetch_compat(url, sender, fetch_ok).await {
+            eprintln!("{e}");
         }
-
-        std::result::Result::<(), surf::Error>::Ok(())
     });
 }
 
 #[cfg(feature = "smol")]
-fn fetch_async_smol(url: String, sender: Sender<Vec<u8>>, fetch_ok: RwSignal<bool>) {
-    use async_compat::CompatExt;
-
+fn fetch_async_smol(url: String, sender: Sender<Bytes>, fetch_ok: RwSignal<bool>) {
     smol::spawn(async move {
-        let response = reqwest::get(url).compat().await?;
-        let bytes = response.bytes().compat().await?;
-        if sender.send(bytes.to_vec()).is_ok() {
-            fetch_ok.set(true);
+        if let Err(e) = fetch_compat(url, sender, fetch_ok).await {
+            eprintln!("{e}");
         }
-
-        std::result::Result::<(), reqwest::Error>::Ok(())
     })
     .detach();
+}
+
+#[cfg(any(feature = "smol", feature = "async-std"))]
+async fn fetch_compat(
+    url: String,
+    sender: Sender<Bytes>,
+    fetch_ok: RwSignal<bool>,
+) -> Result<(), reqwest::Error> {
+    use async_compat::CompatExt;
+
+    let response = reqwest::get(url).compat().await?;
+    let bytes = response.bytes().compat().await?;
+    if sender.send(bytes).is_ok() {
+        fetch_ok.set(true);
+    }
+
+    Ok(())
 }
