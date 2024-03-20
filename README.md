@@ -10,7 +10,7 @@ Some "things" for [Floem](https://github.com/lapce/floem) (git main)
 - Separator
 - H1/2/3/4/5/6 (text or dynamic with label)
 
-<h4>Features behind feature flags</h4>
+<h4>Things behind feature flags</h4>
 
 - <h4>async-img</h4>
     Loads image from url asynchronously on background task or thread.
@@ -22,7 +22,7 @@ Some "things" for [Floem](https://github.com/lapce/floem) (git main)
     Floem uses `async-std` by default so if you want to use `tokio`, disable default features on this crate.
 - <h4>cache</h4>
 
-    Enables `AsyncCache` that stores fetched bytes in a `DashMap`.
+    Enables `AsyncCache` for async image. Stores fetched images in a `DashMap`.
     </br>
     </br>
 
