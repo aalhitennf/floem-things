@@ -19,14 +19,24 @@ Some views and widgets for [Floem](https://github.com/lapce/floem)
     Enable runtime support with one of the feature flags: `tokio`, `async-std`, `smol`. Or `thread` without any async runtime.
     </br>
     Floem uses `async-std` by default so if you want to use `tokio`, disable default features on this crate.
+- <h4>cache</h4>
+
+    Enables `AsyncCache` that stores fetched bytes in a `DashMap`.
+    </br>
+    </br>
+
+    You need to create and provide the cache with floems `provide_context` function. See `examples/async_cache.rs`.
 
 
 <h4>Examples</h4>
 
-Examples can be run with cargo
-
+Split</br>
 `cargo run --example split`</br>
-`cargo run --example async_image --features async-img,async-std`</br>
-`cargo run --example async_image --features async-img,smol`</br>
-`cargo run --example async_image --features async-img,thread`</br>
-`cargo run --example async_image --no-default-features --features async-img,tokio`
+
+Async image</br>
+`cargo run --example async_image --features async-img,{async-std,smol,thread}`</br>
+`cargo run --example async_image --no-default-features --features async-img,tokio`</br>
+
+Async image with cache</br>
+`cargo run --example async_cache --features async-img,cache,{async-std,smol,thread}`</br>
+`cargo run --example async_cache --no-default-features --features async-img,cache,tokio`</br>
