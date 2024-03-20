@@ -1,7 +1,8 @@
 
 ![Thonk](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuuoecUcG7XuBfkUagFMrsRody7Lx5uG2Bv6C26Kq3pQ&s)
 
-Some views and widgets for [Floem](https://github.com/lapce/floem)
+Some "things" for [Floem](https://github.com/lapce/floem) (git main)
+
 
 <h4>Basic things</h4>
 
