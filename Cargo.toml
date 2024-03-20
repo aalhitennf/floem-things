@@ -4,4 +4,24 @@ edition = "2021"
 version = "0.1.0"
 
 [dependencies]
-floem = { git = "https://github.com/lapce/floem", default-features = false, features = ["rfd-async-std"] }
+crossbeam-channel = "0.5.12"
+floem = { git = "https://github.com/lapce/floem", default-features = false }
+
+async-compat = { version = "0.2.3", optional = true }
+async-std = { version = "1.12.0", optional = true }
+reqwest = { version = "0.11.27", optional = true, features = ["default-tls"], default-features = false }
+smol = { version = "2.0.0", optional = true }
+surf = { version = "2.3.2", default-features = false, features = ["hyper-client"], optional = true }
+tokio = { version = "1.36.0", default-features = false, optional = true }
+
+[dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
+tokio = { version = "1.36.0", default-features = false, features = ["rt-multi-thread", "macros"] }
+smol = { version = "2.0.0" }
+
+[features]
+default = ["floem/rfd-async-std"]
+async-img = []
+tokio = ["dep:tokio", "dep:reqwest", "floem/rfd-tokio"]
+async-std = ["dep:async-std", "dep:surf", "floem/rfd-async-std"]
+smol = ["dep:smol", "dep:async-compat", "dep:reqwest", "floem/rfd-async-std"]
