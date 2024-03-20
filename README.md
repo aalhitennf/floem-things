@@ -18,7 +18,7 @@ Some views and widgets for [Floem](https://github.com/lapce/floem)
 
     Enable runtime support with one of the feature flags: `tokio`, `async-std` or `smol`.
     </br>
-    Floem uses `async-std` by default so if you want to use `tokio` or `smol`, disable default features on this crate.
+    Floem uses `async-std` by default so if you want to use `tokio`, disable default features on this crate.
 
 
 <h4>Examples</h4>
