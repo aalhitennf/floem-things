@@ -12,7 +12,7 @@ Some views and widgets for [Floem](https://github.com/lapce/floem)
 <h4>Features behind feature flags</h4>
 
 - <h4>async-img</h4>
-    Loads image from url asynchronously on background task, requires async runtime.
+    Loads image from url asynchronously on background task or thread.
     </br>
     </br>
 
@@ -23,8 +23,10 @@ Some views and widgets for [Floem](https://github.com/lapce/floem)
 
 <h4>Examples</h4>
 
-Examples can be run with cargo.
+Examples can be run with cargo
 
-`cargo run --example split`
-
-`cargo run --example --no-default-features --features async-img,tokio`
+`cargo run --example split`</br>
+`cargo run --example async_image --features async-img,async-std`</br>
+`cargo run --example async_image --features async-img,smol`</br>
+`cargo run --example async_image --features async-img,thread`</br>
+`cargo run --example async_image --no-default-features --features async-img,tokio`
