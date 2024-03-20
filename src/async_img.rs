@@ -101,6 +101,9 @@ fn async_image_view(
 
         #[cfg(feature = "smol")]
         fetch_async_smol(image_url.get_untracked(), tx.get_untracked(), fetch_ok);
+
+        #[cfg(feature = "thread")]
+        fetch_thread(image_url.get_untracked(), tx.get_untracked(), fetch_ok);
     });
 
     img(move || buffer.get().to_vec())
@@ -136,6 +139,19 @@ fn fetch_async_smol(url: String, sender: Sender<Bytes>, fetch_ok: RwSignal<bool>
         }
     })
     .detach();
+}
+
+#[cfg(feature = "thread")]
+fn fetch_thread(url: String, sender: Sender<Bytes>, fetch_ok: RwSignal<bool>) {
+    let _ = std::thread::spawn(move || {
+        let response = reqwest::blocking::get(url)?;
+        let bytes = response.bytes()?;
+        if sender.send(bytes).is_ok() {
+            fetch_ok.set(true);
+        }
+
+        std::result::Result::<(), reqwest::Error>::Ok(())
+    });
 }
 
 #[cfg(any(feature = "smol", feature = "async-std"))]
