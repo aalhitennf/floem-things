@@ -25,6 +25,8 @@ async fn main() {
 
 #[cfg(feature = "smol")]
 fn main() {
+    std::env::set_var("SMOL_THREADS", "4");
+
     smol::block_on(async {
         floem::launch(main_view);
     });
