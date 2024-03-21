@@ -22,7 +22,7 @@ Some "things" for [Floem](https://github.com/lapce/floem) (git main)
     Floem uses `async-std` by default so if you want to use `tokio`, disable default features on this crate.
 - <h4>cache</h4>
 
-    Enables `AsyncCache` for async image. Stores fetched images in a `DashMap`.
+    Enables `async-img` and `AsyncCache` for it. Stores fetched images in a `DashMap`.
     </br>
     </br>
 
@@ -35,9 +35,9 @@ Split</br>
 `cargo run --example split`</br>
 
 Async image</br>
-`cargo run --example async_image --features async-img,{async-std,smol,thread}`</br>
-`cargo run --example async_image --no-default-features --features async-img,tokio`</br>
+`cargo run --example async_image --features {async-std,smol,thread}`</br>
+`cargo run --example async_image --no-default-features --features tokio`</br>
 
 Async image with cache</br>
-`cargo run --example async_cache --features async-img,cache,{async-std,smol,thread}`</br>
-`cargo run --example async_cache --no-default-features --features async-img,cache,tokio`</br>
+`cargo run --example async_cache --features cache,{async-std,smol,thread}`</br>
+`cargo run --example async_cache --no-default-features --features cache,tokio`</br>
