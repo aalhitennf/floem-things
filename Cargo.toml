@@ -16,6 +16,7 @@ tokio = { version = "1.36.0", default-features = false, optional = true }
 xxhash-rust = { version = "0.8.10", optional = true, features = ["xxh64", "xxh3"] }
 dashmap = { version = "5.5.3", optional = true, features = ["inline"] }
 url = { version = "2.5.0", optional = true }
+futures = { version = "0.3.30", optional = true, default-features = false }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -25,7 +26,7 @@ smol = { version = "2.0.0" }
 [features]
 default = ["floem/rfd-async-std"]
 async-img = ["dep:bytes", "dep:reqwest", "dep:crossbeam-channel", "dep:url"]
-cache = ["async-img", "dep:xxhash-rust", "dep:dashmap"]
+cache = ["async-img", "dep:xxhash-rust", "dep:dashmap", "dep:futures"]
 tokio = ["async-img", "dep:tokio", "floem/rfd-tokio"]
 async-std = ["async-img", "dep:async-std", "dep:async-compat", "floem/rfd-async-std"]
 smol = ["async-img", "dep:smol", "dep:async-compat", "floem/rfd-async-std"]

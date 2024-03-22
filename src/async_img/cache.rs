@@ -6,12 +6,12 @@ use bytes::Bytes;
 use crossbeam_channel::Sender;
 use dashmap::{DashMap, DashSet};
 use reqwest::Url;
-use xxhash_rust::xxh3::Xxh3Builder;
+use xxhash_rust::xxh3::{xxh3_64, Xxh3Builder};
 
 #[derive(Clone)]
 pub struct AsyncCache {
     map: Arc<DashMap<Url, Bytes, Xxh3Builder>>,
-    placeholder: Option<Bytes>,
+    config: CacheConfig,
     fetching: Arc<DashSet<Url, Xxh3Builder>>,
 }
 
@@ -21,10 +21,10 @@ impl Default for AsyncCache {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CacheConfig {
     pub placeholder: Option<Bytes>,
-    pub cache_on_disk: Option<PathBuf>,
+    pub local_cache_path: Option<PathBuf>,
     pub alive_time: Option<Duration>,
 }
 
@@ -33,22 +33,29 @@ impl AsyncCache {
     pub fn new() -> Self {
         AsyncCache {
             map: Arc::new(DashMap::with_hasher(Xxh3Builder::new())),
-            placeholder: None,
+            config: CacheConfig::default(),
             fetching: Arc::new(DashSet::with_hasher(Xxh3Builder::new())),
         }
     }
 
     #[must_use]
-    pub fn with_config(config: CacheConfig) -> Self {
+    pub fn with_config(mut config: CacheConfig) -> Self {
+        if let Some(local_cache_path) = &config.local_cache_path {
+            if let Err(e) = std::fs::create_dir_all(local_cache_path) {
+                eprintln!("Cannot create local cache dir: {e}");
+                config.local_cache_path = None;
+            }
+        }
+
         AsyncCache {
             map: Arc::new(DashMap::with_hasher(Xxh3Builder::new())),
-            placeholder: config.placeholder,
+            config,
             fetching: Arc::new(DashSet::with_hasher(Xxh3Builder::new())),
         }
     }
 
     pub fn url(&self, sender: &Sender<Bytes>, url: &str) {
-        if let Some(placeholder) = &self.placeholder {
+        if let Some(placeholder) = &self.config.placeholder {
             if let Err(e) = sender.send(placeholder.clone()) {
                 eprintln!("{e}");
             }
@@ -72,108 +79,201 @@ impl AsyncCache {
         }
     }
 
-    #[cfg(feature = "async-std")]
     fn fetch(&self, url: Url, sender: Sender<Bytes>) {
-        use async_compat::CompatExt;
-
         let shared_map = Arc::clone(&self.map);
         let shared_fetchlist = Arc::clone(&self.fetching);
 
-        async_std::task::spawn(async move {
-            let do_the_thing = || async {
-                let response = reqwest::get(url.clone()).compat().await?;
-                let bytes = response.bytes().compat().await?;
+        let local_file_path = self
+            .config
+            .local_cache_path
+            .as_ref()
+            .map(|p| p.join(xxh3_64(url.as_str().as_bytes()).to_string()));
 
-                sender.send(bytes.clone()).unwrap();
+        #[cfg(feature = "async-std")]
+        async_std::task::spawn(async_fetch(
+            url,
+            local_file_path,
+            shared_map,
+            shared_fetchlist,
+            sender,
+        ));
 
-                shared_map.insert(url.clone(), bytes);
+        #[cfg(feature = "tokio")]
+        tokio::spawn(async_fetch(
+            url,
+            local_file_path,
+            shared_map,
+            shared_fetchlist,
+            sender,
+        ));
 
-                reqwest::Result::Ok(())
-            };
+        #[cfg(feature = "smol")]
+        smol::spawn(async_fetch(
+            url,
+            local_file_path,
+            shared_map,
+            shared_fetchlist,
+            sender,
+        ))
+        .detach();
 
-            if let Err(e) = do_the_thing().compat().await {
-                eprintln!("{e}");
-            }
-
-            let _ = shared_fetchlist.remove(&url);
+        #[cfg(feature = "thread")]
+        std::thread::spawn(move || {
+            sync_fetch(
+                &url,
+                local_file_path,
+                &shared_map,
+                &shared_fetchlist,
+                &sender,
+            );
         });
     }
+}
 
-    #[cfg(feature = "tokio")]
-    fn fetch(&self, url: Url, sender: Sender<Bytes>) {
-        let shared_map = Arc::clone(&self.map);
-        let shared_fetchlist = Arc::clone(&self.fetching);
+#[cfg(any(feature = "async-std", feature = "tokio", feature = "smol"))]
+async fn async_fetch(
+    url: Url,
+    local_file_path: Option<PathBuf>,
+    shared_map: Arc<DashMap<Url, Bytes, Xxh3Builder>>,
+    shared_fetchlist: Arc<DashSet<Url, Xxh3Builder>>,
+    sender: Sender<Bytes>,
+) {
+    use futures::{future::Either, pin_mut};
 
-        tokio::spawn(async move {
-            let do_the_thing = || async {
-                let response = reqwest::get(url.clone()).await?;
-                let bytes = response.bytes().await?;
+    let read_local = async { read_path(local_file_path.clone()).await.ok() };
+    pin_mut!(read_local);
 
-                sender.send(bytes.clone()).unwrap();
+    let fetch_url = async { fetch(&url).await.ok() };
+    pin_mut!(fetch_url);
+    let (bytes, _) = futures::future::select(read_local, fetch_url)
+        .await
+        .factor_first();
 
-                shared_map.insert(url.clone(), bytes);
+    if let Some(bytes) = bytes {
+        sender.send(bytes.clone()).unwrap();
+        shared_map.insert(url.clone(), bytes.clone());
+        let _ = shared_fetchlist.remove(&url);
 
-                reqwest::Result::Ok(())
-            };
+        if let Some(local) = &local_file_path {
+            let _ = write_bytes(local, bytes).await;
+        }
+    }
+}
 
-            if let Err(e) = do_the_thing().await {
-                eprintln!("{e}");
-            }
+#[cfg(feature = "thread")]
+fn sync_fetch(
+    url: &Url,
+    local_file_path: Option<PathBuf>,
+    shared_map: &Arc<DashMap<Url, Bytes, Xxh3Builder>>,
+    shared_fetchlist: &Arc<DashSet<Url, Xxh3Builder>>,
+    sender: &Sender<Bytes>,
+) {
+    let handle_ok = |bytes: Bytes| {
+        let _ = sender.send(bytes.clone());
+        shared_map.insert(url.clone(), bytes);
+        let _ = shared_fetchlist.remove(url);
+    };
 
-            let _ = shared_fetchlist.remove(&url);
-        });
+    // Try local
+    if let Some(local_path) = &local_file_path {
+        if let Ok(bytes) = std::fs::read(local_path) {
+            handle_ok(bytes.into());
+            return;
+        }
+    }
+
+    // Fetch
+    if let Ok(bytes) = fetch(url) {
+        handle_ok(bytes.clone());
+
+        if let Some(local_path) = local_file_path {
+            let _ = write_bytes(&local_path, bytes);
+        }
+    }
+}
+
+#[cfg(any(feature = "async-std", feature = "smol"))]
+async fn fetch(url: &Url) -> Result<Bytes, reqwest::Error> {
+    use async_compat::CompatExt;
+
+    let response = reqwest::get(url.clone()).compat().await?;
+    let bytes = response.bytes().compat().await?;
+
+    Ok(bytes)
+}
+
+#[cfg(feature = "tokio")]
+async fn fetch(url: &Url) -> Result<Bytes, reqwest::Error> {
+    let response = reqwest::get(url.clone()).await?;
+    let bytes = response.bytes().await?;
+    Ok(bytes)
+}
+
+#[cfg(feature = "thread")]
+fn fetch(url: &Url) -> Result<Bytes, reqwest::Error> {
+    let response = reqwest::blocking::get(url.clone())?;
+    let bytes = response.bytes()?;
+    Ok(bytes)
+}
+
+#[cfg(any(feature = "async-std", feature = "tokio", feature = "smol"))]
+async fn read_path(path: Option<PathBuf>) -> Result<Bytes, Box<dyn std::error::Error>> {
+    let Some(path) = path else {
+        futures::future::pending::<()>().await;
+        return Ok(Bytes::default());
+    };
+
+    if !path.exists() {
+        futures::future::pending::<()>().await;
+        return Ok(Bytes::default());
     }
 
     #[cfg(feature = "smol")]
-    fn fetch(&self, url: Url, sender: Sender<Bytes>) {
-        use async_compat::CompatExt;
+    let bytes = smol::fs::read(path).await?.into();
 
-        let shared_map = Arc::clone(&self.map);
-        let shared_fetchlist = Arc::clone(&self.fetching);
+    #[cfg(feature = "async-std")]
+    let bytes = async_std::fs::read(path).await?.into();
 
-        smol::spawn(async move {
-            let do_the_thing = || async {
-                let response = reqwest::get(url.clone()).compat().await?;
-                let bytes = response.bytes().compat().await?;
+    #[cfg(feature = "tokio")]
+    let bytes = tokio::fs::read(path).await?.into();
 
-                sender.send(bytes.clone()).unwrap();
+    Ok(bytes)
+}
 
-                shared_map.insert(url.clone(), bytes);
+#[cfg(feature = "thread")]
+fn read_path(path: Option<PathBuf>) -> Result<Bytes, std::io::Error> {
+    let Some(path) = path else {
+        return Ok(Bytes::default());
+    };
 
-                reqwest::Result::Ok(())
-            };
-
-            if let Err(e) = do_the_thing().compat().await {
-                eprintln!("{e}");
-            }
-
-            let _ = shared_fetchlist.remove(&url);
-        })
-        .detach();
+    if !path.exists() {
+        return Ok(Bytes::default());
     }
 
-    #[cfg(feature = "thread")]
-    fn fetch(&self, url: Url, sender: Sender<Bytes>) {
-        let shared_map = Arc::clone(&self.map);
-        let shared_fetchlist = Arc::clone(&self.fetching);
+    let bytes = std::fs::read(path)?.into();
+    Ok(bytes)
+}
 
-        std::thread::spawn(move || {
-            let do_the_thing = || {
-                let response = reqwest::blocking::get(url.clone())?;
-                let bytes = response.bytes()?;
+#[cfg(feature = "async-std")]
+async fn write_bytes(path: &PathBuf, bytes: Bytes) -> Result<(), async_std::io::Error> {
+    async_std::fs::write(path, bytes).await?;
+    Ok(())
+}
 
-                sender.send(bytes.clone()).unwrap();
+#[cfg(feature = "thread")]
+fn write_bytes(path: &PathBuf, bytes: Bytes) -> Result<(), std::io::Error> {
+    std::fs::write(path, bytes)?;
+    Ok(())
+}
 
-                shared_map.insert(url.clone(), bytes);
+#[cfg(feature = "smol")]
+async fn write_bytes(path: &PathBuf, bytes: Bytes) -> Result<(), smol::io::Error> {
+    smol::fs::write(path, bytes).await?;
+    Ok(())
+}
 
-                reqwest::Result::Ok(())
-            };
-
-            if let Err(e) = do_the_thing() {
-                eprintln!("{e}");
-            }
-
-            let _ = shared_fetchlist.remove(&url);
-        });
-    }
+#[cfg(feature = "tokio")]
+async fn write_bytes(path: &PathBuf, bytes: Bytes) -> Result<(), tokio::io::Error> {
+    tokio::fs::write(path, bytes).await?;
+    Ok(())
 }

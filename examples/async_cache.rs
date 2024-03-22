@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use floem::{
     reactive::{provide_context, RwSignal},
     style::Style,
