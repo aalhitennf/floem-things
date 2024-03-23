@@ -7,7 +7,7 @@ use floem::{
     reactive::{with_scope, RwSignal, Scope},
     style::{CursorStyle, Style},
     style_class,
-    unit::{PxPct, PxPctAuto},
+    unit::{Px, PxPct, PxPctAuto, UnitExt},
     view::{AnyView, View, ViewData},
     views::{container, empty, h_stack, v_stack, Decorators},
 };
@@ -24,7 +24,7 @@ pub struct Split {
     a: AnyView,
     b: AnyView,
 
-    min_split: f64,
+    min_split: Px,
     default_split: PxPct,
     dynamic: bool,
     axis: Orientation,
@@ -32,6 +32,9 @@ pub struct Split {
     size: Size,
     split_value: PxPct,
     dragging: bool,
+
+    dragger_size: Px,
+    dragger_style: Style,
 }
 
 impl Split {
@@ -47,7 +50,7 @@ impl Split {
             a,
             b,
 
-            min_split: 50.0,
+            min_split: 50.0.px(),
             default_split: PxPct::Pct(50.0),
             dynamic: true,
             axis: Orientation::Vertical,
@@ -55,16 +58,20 @@ impl Split {
             size: Size::ZERO,
             split_value: PxPct::Pct(50.0),
             dragging: false,
+
+            dragger_size: 4.px(),
+            dragger_style: Style::new(),
         }
     }
 
     /// Pixels
     #[must_use]
-    pub fn min_split(mut self, value: f64) -> Self {
-        self.min_split = value;
+    pub fn min_split(mut self, value: impl Into<Px>) -> Self {
+        self.min_split = value.into();
         self
     }
 
+    /// Pixels or percent
     #[must_use]
     pub fn default_split(mut self, value: impl Into<PxPct> + Clone) -> Self {
         self.default_split = value.clone().into();
@@ -72,6 +79,7 @@ impl Split {
         self
     }
 
+    /// Should split keep the ratio on resize if user has changed it
     #[must_use]
     pub fn dynamic(mut self, value: bool) -> Self {
         self.dynamic = value;
@@ -83,6 +91,53 @@ impl Split {
         self.axis = orientation;
         self
     }
+
+    // Shortcut for dragger size
+    #[must_use]
+    pub fn dragger_size(mut self, size: impl Into<Px>) -> Self {
+        self.dragger_size = size.into();
+        self
+    }
+
+    /// Customize style
+    #[must_use]
+    pub fn dragger_style(mut self, f: impl FnOnce(Style) -> Style) -> Self {
+        self.dragger_style = f(self.dragger_style);
+        self
+    }
+}
+
+fn build_dragger_style(dragging: RwSignal<bool>, size: Px, orientation: Orientation) -> Style {
+    Style::new()
+        .apply_if(matches!(orientation, Orientation::Horizontal), |s| {
+            s.width(size).cursor(CursorStyle::ColResize)
+        })
+        .apply_if(matches!(orientation, Orientation::Vertical), |s| {
+            s.height(size).cursor(CursorStyle::RowResize)
+        })
+        .background(Color::rgb8(205, 205, 205))
+        .hover(|s| {
+            s.apply_if(matches!(orientation, Orientation::Horizontal), |s| {
+                s.width(size.0 + 2.0)
+            })
+            .apply_if(matches!(orientation, Orientation::Vertical), |s| {
+                s.height(size.0 + 2.0)
+            })
+            .z_index(11)
+            .background(Color::rgb8(41, 98, 218))
+            .border_color(Color::rgb8(41, 98, 218))
+        })
+        .apply_if(dragging.get(), |s| {
+            s.apply_if(matches!(orientation, Orientation::Horizontal), |s| {
+                s.width(size.0 + 2.0)
+            })
+            .apply_if(matches!(orientation, Orientation::Vertical), |s| {
+                s.height(size.0 + 2.0)
+            })
+            .z_index(100)
+            .border_color(Color::rgb8(41, 98, 218))
+            .background(Color::rgb8(41, 98, 218))
+        })
 }
 
 impl View for Split {
@@ -110,6 +165,11 @@ impl View for Split {
         let a = self.a;
         let b = self.b;
 
+        let dragger_size = self.dragger_size;
+
+        let dragger_style =
+            build_dragger_style(dragging, dragger_size, axis).apply(self.dragger_style);
+
         with_scope(cx, || match axis {
             Orientation::Horizontal => split_v(
                 a,
@@ -120,6 +180,7 @@ impl View for Split {
                 min_split,
                 default_split,
                 dynamic,
+                dragger_style,
             )
             .any(),
             Orientation::Vertical => split_h(
@@ -131,6 +192,7 @@ impl View for Split {
                 min_split,
                 default_split,
                 dynamic,
+                dragger_style,
             )
             .any(),
         })
@@ -146,11 +208,19 @@ fn split_v(
     size: RwSignal<Size>,
     width: RwSignal<PxPct>,
     dragging: RwSignal<bool>,
-    min_split: f64,
+    min_split: Px,
     default_split: PxPct,
     dynamic: bool,
+    dragger_style: Style,
 ) -> impl View {
-    let dragger = dragger_v(width, dragging, min_split, default_split, size);
+    let dragger = dragger_v(
+        width,
+        dragging,
+        min_split,
+        default_split,
+        size,
+        dragger_style,
+    );
 
     let a_con = container(a).style(move |s| s.min_width(min_split).width(to_auto(width.get())));
     let b_con = container(b).style(move |s| {
@@ -189,11 +259,19 @@ fn split_h(
     size: RwSignal<Size>,
     height: RwSignal<PxPct>,
     dragging: RwSignal<bool>,
-    min_split: f64,
+    min_split: Px,
     default_split: PxPct,
     dynamic: bool,
+    dragger_style: Style,
 ) -> impl View {
-    let dragger = dragger_h(height, dragging, min_split, default_split, size);
+    let dragger = dragger_h(
+        height,
+        dragging,
+        min_split,
+        default_split,
+        size,
+        dragger_style,
+    );
 
     let a_con = container(a).style(move |s| s.min_height(min_split).height(to_auto(height.get())));
 
@@ -229,19 +307,20 @@ fn split_h(
 fn dragger_h(
     height: RwSignal<PxPct>,
     dragging: RwSignal<bool>,
-    min_size: f64,
+    min_size: Px,
     default_split: PxPct,
     size: RwSignal<Size>,
+    style: Style,
 ) -> impl View {
     empty()
         .class(SplitDraggerHorizontalClass)
         .style(move |s| {
             let size = size.get();
             let px = px_w(size.height, height.get());
-            let max = size.height - min_size;
+            let max = size.height - min_size.0;
 
-            let w = if px < min_size {
-                min_size
+            let w = if px < min_size.0 {
+                min_size.0
             } else if px > max {
                 max
             } else {
@@ -254,21 +333,7 @@ fn dragger_h(
                 .absolute()
                 .width_full()
                 .z_index(10)
-                .height(4)
-                .background(Color::rgb8(205, 205, 205))
-                .hover(|s| {
-                    s.height(6)
-                        .z_index(11)
-                        .background(Color::rgb8(41, 98, 218))
-                        .border_color(Color::rgb8(41, 98, 218))
-                        .cursor(CursorStyle::RowResize)
-                })
-                .apply_if(dragging.get(), |s| {
-                    s.height(6)
-                        .z_index(100)
-                        .border_color(Color::rgb8(41, 98, 218))
-                        .background(Color::rgb8(41, 98, 218))
-                })
+                .apply(style.clone())
         })
         .draggable()
         .dragging_style(|s| {
@@ -292,19 +357,20 @@ fn dragger_h(
 fn dragger_v(
     width: RwSignal<PxPct>,
     dragging: RwSignal<bool>,
-    min_size: f64,
+    min_size: Px,
     default_split: PxPct,
     size: RwSignal<Size>,
+    style: Style,
 ) -> impl View {
     empty()
         .class(SplitDraggerVerticalClass)
         .style(move |s| {
             let size = size.get();
             let px = px_w(size.width, width.get());
-            let max = size.width - min_size;
+            let max = size.width - min_size.0;
 
-            let w = if px < min_size {
-                min_size
+            let w = if px < min_size.0 {
+                min_size.0
             } else if px > max {
                 max
             } else {
@@ -317,21 +383,7 @@ fn dragger_v(
                 .absolute()
                 .height_full()
                 .z_index(10)
-                .width(4)
-                .background(Color::rgb8(205, 205, 205))
-                .hover(|s| {
-                    s.z_index(11)
-                        .width(6)
-                        .background(Color::rgb8(41, 98, 218))
-                        .border_color(Color::rgb8(41, 98, 218))
-                        .cursor(CursorStyle::ColResize)
-                })
-                .apply_if(dragging.get(), |s| {
-                    s.width(6)
-                        .z_index(100)
-                        .border_color(Color::rgb8(41, 98, 218))
-                        .background(Color::rgb8(41, 98, 218))
-                })
+                .apply(style.clone())
         })
         .draggable()
         .dragging_style(|s| {

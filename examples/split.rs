@@ -35,6 +35,10 @@ fn main() {
         .orientation(Orientation::Vertical)
         .default_split(35.pct())
         .min_split(50.0)
+        .dragger_style(|s| {
+            s.height(10)
+                .hover(|s| s.height(12).background(Color::REBECCA_PURPLE))
+        })
         .style(|s| s.size_full());
 
     let view = container(main_split)
